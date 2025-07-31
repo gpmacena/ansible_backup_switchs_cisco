@@ -15,16 +15,14 @@ Este projeto realiza o **backup automático** das configurações de switches Ci
 3. Acesso SSH aos switches Cisco.
 
 ## 📂 Estrutura do Projeto
-```
-.
+
 ├── playbook.yml         # Playbook principal          
 └── roles/
     └── network_backup_switches_cisco/
         └── tasks/
             └── main.yml
         └── vars/
-            └── main.yml      # Variáveis sensíveis (edite antes de usar) e criptografe
-```
+            └── main.yml      # Variáveis sensíveis 
 
 ## 🔹 Configuração
 Edite o arquivo **`vars/main.yml`** antes de executar:
