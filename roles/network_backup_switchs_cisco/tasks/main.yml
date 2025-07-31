@@ -1,0 +1,72 @@
+---
+# 📌 Aguarda até 10 segundos para verificar se a porta 22 (SSH) do host está acessível
+- name: Garantir que host está acessível na porta 22
+  wait_for:
+    host: "{{ ansible_host }}"  # Endereço IP ou hostname do dispositivo
+    port: 22
+    timeout: 10
+  register: ssh_status
+  ignore_errors: yes
+
+# 📌 Se o host estiver inacessível, encerra a execução para ele
+- name: Pular se o host estiver inacessível
+  meta: end_host
+  when: ssh_status is failed
+
+# 📌 Define o hostname a partir do inventário Ansible
+- name: Definir hostname a partir dos facts
+  set_fact:
+    equipamento_hostname: "{{ inventory_hostname }}"
+
+# 📌 Obtém data e hora (formato AAAAMMDD-HHMM) no fuso horário de São Paulo
+- name: Obter data e hora local (UTC-3)
+  set_fact:
+    data_atual: "{{ lookup('pipe', 'TZ=America/Sao_Paulo date +%Y%m%d') }}"
+    hora_atual: "{{ lookup('pipe', 'TZ=America/Sao_Paulo date +%H%M') }}"
+    formatted_datetime: "{{ lookup('pipe', 'TZ=America/Sao_Paulo date +%Y%m%d-%H%M') }}"
+
+# 📌 Cria nome de arquivo no formato SW-<hostname>-AAAAMMDD-HHMM.txt
+- name: Definir nome do arquivo
+  set_fact:
+    backup_filename: "SW-{{ equipamento_hostname | regex_replace('[^a-zA-Z0-9_-]', '') }}-{{ formatted_datetime }}.txt"
+
+# 📌 Faz backup da running-config via TFTP
+- name: Fazer backup da running-config via FTP com múltiplos prompts
+  ansible.builtin.expect:
+    command: >
+      ssh -o StrictHostKeyChecking=no {{ ssh_username }}@{{ ansible_host }}
+      'copy running-config tftp://{{ ftp_server_ip }}/{{ backup_filename }}'
+    responses:
+      "Are you sure you want to continue connecting.*": "yes\n"
+      "[Pp]assword:": "{{ ssh_password }}"  # 🔹 ALTERAR: senha SSH do equipamento
+      "Address or name of remote host.*": ""  # Confirma host remoto
+      "Destination filename.*": ""  # Aceita nome padrão
+    timeout: 360
+  delegate_to: localhost
+  register: backup_result
+  ignore_errors: yes
+
+# 📌 Tenta novamente usando VRF "management" caso falhe por rota
+- name: Tentar de novo com VRF management
+  ansible.builtin.expect:
+    command: >
+      ssh -o StrictHostKeyChecking=no {{ ssh_username }}@{{ ansible_host }}
+      'copy running-config tftp://{{ ftp_server_ip }}/{{ backup_filename }} vrf management'
+    responses:
+      "Are you sure you want to continue connecting.*": "yes\n"
+      "[Pp]assword:": "{{ ssh_password }}"  # 🔹 ALTERAR: senha SSH
+      "Address or name of remote host.*": ""
+      "Destination filename.*": ""
+    timeout: 360
+  delegate_to: localhost
+  when: >
+    backup_result.failed or
+    ('TFTP put operation failed: No route to host' in (backup_result.stdout | default('')))
+  register: fallback_result
+  ignore_errors: yes
+
+# 📌 Exibe falhas de backup (caso existam)
+- name: Exibir falhas de backup se houver
+  debug:
+    msg: "Falha ao fazer backup: {{ fallback_result }}"
+  when: backup_result.failed is defined and backup_result.failed

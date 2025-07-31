@@ -1,0 +1,13 @@
+---
+# 🔹 ALTERAR: Endereço IP do servidor TFTP
+ftp_server_ip: "XXX.XXX.XXX.XXX"
+
+# Timeout de execução
+ansible_command_timeout: 90
+
+# 🔹 ALTERAR: Usuário e senha SSH dos equipamentos
+ssh_username: "USUARIO_SSH"
+ssh_password: "SENHA_SSH"
+
+# Sistema operacional de rede (Cisco NX-OS)
+ansible_network_os: nxos

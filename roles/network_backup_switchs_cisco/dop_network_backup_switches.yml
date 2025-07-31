@@ -1,0 +1,7 @@
+---
+- name: Backup da configuração Cisco via FTP com múltiplos prompts
+  hosts: all
+  gather_facts: yes
+  connection: network_cli
+  roles:
+    - network_backup_switches_cisco
